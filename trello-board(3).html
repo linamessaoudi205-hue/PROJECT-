@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Web Page Build — Task Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-1: #071a26;
+    --bg-2: #0e2534;
+    --lane-bg: #102a3a;
+    --lane-border: rgba(140,200,220,0.10);
+    --grid-line: rgba(140,200,220,0.055);
+    --ink: #eaf3f6;
+    --muted: #7fa3b3;
+    --card-bg: #123246;
+    --card-ink: #eaf3f6;
+    --card-sub: #9fc0cd;
+    --card-border: rgba(140,200,220,0.14);
+    --divider: rgba(140,200,220,0.14);
+
+    --html-accent: #ff6b4a;
+    --css-accent: #1fcaa8;
+    --js-accent: #ffc94a;
+
+    --pill-bg: rgba(140,200,220,0.10);
+    --shadow: 0 10px 24px rgba(0,0,0,0.35);
+    --radius: 12px;
+    --radius-sm: 7px;
+  }
+
+  html[data-theme="light"]{
+    --bg-1: #eef3f7;
+    --bg-2: #ffffff;
+    --lane-bg: #f3f7fa;
+    --lane-border: rgba(15,50,70,0.08);
+    --grid-line: rgba(15,50,70,0.045);
+    --ink: #0f2634;
+    --muted: #4d6b78;
+    --card-bg: #ffffff;
+    --card-ink: #16303d;
+    --card-sub: #4b6774;
+    --card-border: rgba(15,50,70,0.08);
+    --divider: rgba(15,50,70,0.10);
+
+    --pill-bg: rgba(15,50,70,0.06);
+    --shadow: 0 10px 24px rgba(20,50,70,0.12);
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin: 0;
+    min-height: 100vh;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/40px 40px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/40px 40px,
+      var(--bg-1);
+    font-family: "Inter", -apple-system, sans-serif;
+    color: var(--ink);
+    padding: 32px 24px 60px;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  .wrap{ max-width: 1040px; margin: 0 auto; }
+
+  header{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 26px;
+    flex-wrap: wrap;
+  }
+
+  .heading-block h1{
+    font-family: "Space Grotesk", sans-serif;
+    margin: 0 0 6px;
+    font-size: 1.8rem;
+    letter-spacing: 0.2px;
+    font-weight: 700;
+  }
+
+  .heading-block p{
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  .controls{
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-btn{
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: var(--pill-bg);
+    color: var(--ink);
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    padding: 9px 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .ctrl-btn:hover{ background: rgba(140,200,220,0.18); transform: translateY(-1px); }
+  .ctrl-btn:active{ transform: translateY(0); }
+  .ctrl-btn.active{ border-color: var(--js-accent); color: var(--js-accent); }
+
+  .board{
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 12px;
+  }
+
+  .lane{
+    background: var(--lane-bg);
+    border-radius: 16px;
+    padding: 16px;
+    width: 290px;
+    flex: 0 0 290px;
+    border: 1px solid var(--lane-border);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  .lane.dragging-lane{
+    opacity: 0.45;
+    transform: scale(0.98);
+  }
+
+  .lane-title{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.7rem;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: grab;
+    user-select: none;
+  }
+
+  .lane-title:active{ cursor: grabbing; }
+
+  .lane-title-text{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lane-drag-handle{
+    opacity: 0.5;
+    font-size: 0.85rem;
+  }
+
+  .board.drag-over-board .lane:not(.dragging-lane){
+    outline: none;
+  }
+
+  .order-badge{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--pill-bg);
+    color: var(--ink);
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .card{
+    position: relative;
+    background: var(--card-bg);
+    color: var(--card-ink);
+    border-radius: var(--radius);
+    padding: 16px 16px 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--card-border);
+    border-top: 4px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.25s ease;
+  }
+
+  .card:hover{ transform: translateY(-3px); }
+
+  .card[data-topic="html"]{ border-top-color: var(--html-accent); }
+  .card[data-topic="css"]{ border-top-color: var(--css-accent); }
+  .card[data-topic="js"]{ border-top-color: var(--js-accent); }
+
+  /* corner registration marks — blueprint spec-sheet cue */
+  .reg-mark{
+    position: absolute;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    opacity: 0.35;
+    pointer-events: none;
+  }
+  .reg-mark::before, .reg-mark::after{
+    content: "";
+    position: absolute;
+    background: var(--muted);
+  }
+  .reg-mark::before{ width: 8px; height: 1px; top: 4px; left: 0; }
+  .reg-mark::after{ width: 1px; height: 8px; left: 4px; top: 0; }
+  .reg-mark.left{ left: 8px; }
+  .reg-mark.right{ right: 8px; }
+
+  .label{
+    display: inline-block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 4px;
+    color: #fff;
+    margin-bottom: 10px;
+  }
+
+  .card[data-topic="html"] .label{ background: var(--html-accent); }
+  .card[data-topic="css"] .label{ background: var(--css-accent); color:#03231d; }
+  .card[data-topic="js"] .label{ background: var(--js-accent); color:#3a2c00; }
+
+  .card h3{
+    margin: 0 0 6px;
+    font-family: "Space Grotesk", sans-serif;
+    font-size: 1.02rem;
+    font-weight: 600;
+    outline: none;
+  }
+
+  .card p{
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--card-sub);
+    outline: none;
+  }
+
+  [contenteditable="true"]{
+    cursor: text;
+  }
+  [contenteditable="true"]:focus{
+    box-shadow: 0 0 0 2px var(--js-accent);
+    border-radius: 4px;
+  }
+
+  .card-footer{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--divider);
+    padding-top: 11px;
+    gap: 8px;
+  }
+
+  .assignee{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .avatar{
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: "Space Grotesk", sans-serif;
+  }
+
+  .card[data-topic="html"] .avatar{ background: var(--html-accent); }
+  .card[data-topic="css"] .avatar{ background: var(--css-accent); color:#03231d; }
+  .card[data-topic="js"] .avatar{ background: var(--js-accent); color:#3a2c00; }
+
+  .assignee-name{
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    outline: none;
+    max-width: 110px;
+  }
+
+  .status{
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.68rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    transition: transform 0.1s ease;
+  }
+  .status:active{ transform: scale(0.94); }
+
+  .status[data-state="will-do"]{ background: rgba(140,200,220,0.14); color: var(--muted); }
+  .status[data-state="doing"]{ background: rgba(255,201,74,0.16); color: #d69a1a; }
+  html[data-theme="dark"] .status[data-state="doing"]{ color: var(--js-accent); }
+  .status[data-state="done"]{ background: rgba(31,202,168,0.16); color: #0f8f76; }
+  html[data-theme="dark"] .status[data-state="done"]{ color: var(--css-accent); }
+
+  /* lane-cards: a draggable, droppable list of roles within a lane */
+  .lane-cards{
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 30px;
+    border-radius: 12px;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .lane-cards.drag-over{
+    box-shadow: inset 0 0 0 2px var(--js-accent);
+    background: rgba(255,201,74,0.06);
+  }
+
+  .card.dragging{
+    opacity: 0.45;
+  }
+
+  .card[draggable="true"]{ cursor: grab; }
+  .card[draggable="true"]:active{ cursor: grabbing; }
+
+  .drag-handle{
+    position: absolute;
+    top: 8px;
+    right: 22px;
+    font-size: 0.85rem;
+    line-height: 1;
+    color: var(--muted);
+    opacity: 0.45;
+    letter-spacing: 1px;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  .card.subcard{
+    padding: 10px 12px 9px;
+    border-top-width: 3px;
+  }
+
+  .card.subcard h3{
+    font-size: 0.84rem;
+    margin-bottom: 0;
+  }
+
+  .card.subcard .card-footer{
+    margin-top: 9px;
+    padding-top: 8px;
+  }
+
+  .card.subcard .avatar{
+    width: 20px;
+    height: 20px;
+    font-size: 0.6rem;
+  }
+
+  .card.subcard .assignee-name{
+    max-width: 82px;
+    font-size: 0.72rem;
+  }
+
+  .card.subcard .status{
+    font-size: 0.6rem;
+    padding: 3px 8px;
+  }
+
+  footer.note{
+    max-width: 1040px;
+    margin: 26px auto 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  @media (max-width: 640px){
+    header{ flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <div class="heading-block">
+    <h1>Web Page Build — Task Board</h1>
+    <p>Three ordered tasks: structure the page, style it, then bring it to life.</p>
+  </div>
+  <div class="controls">
+    <button class="ctrl-btn" id="editToggle" type="button">✏️ Edit names &amp; roles</button>
+    <button class="ctrl-btn" id="themeToggle" type="button">🌙 Dark mode</button>
+  </div>
+</header>
+
+<div class="board">
+
+  <div class="lane">
+    <div class="lane-title">
+      <span class="lane-title-text"><span class="lane-drag-handle">⠿</span> Step 1 · Structure</span>
+      <span class="order-badge">1</span>
+    </div>
+    <div class="lane-cards" data-topic="html">
+    <div class="card" data-topic="html">
+      <span class="reg-mark left"></span><span class="reg-mark right"></span>
+      <span class="drag-handle">⠿</span>
+      <span class="label" contenteditable="false">HTML</span>
+      <h3 contenteditable="false">Build the page structure</h3>
+      <p contenteditable="false">Set up the semantic HTML skeleton: headings, sections, navigation, and content placeholders the rest of the page will be built on.</p>
+      <div class="card-footer">
+        <div class="assignee">
+          <span class="avatar">M</span>
+          <span class="assignee-name" contenteditable="false">Michael</span>
+        </div>
+        <span class="status" data-state="will-do">Will do</span>
+      </div>
+    </div>
+
+      <div class="card subcard" data-topic="html">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Semantic markup</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Michael</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+      <div class="card subcard" data-topic="html">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Navigation &amp; links</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Michael</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+      <div class="card subcard" data-topic="html">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Forms &amp; inputs</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Michael</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane">
+    <div class="lane-title">
+      <span class="lane-title-text"><span class="lane-drag-handle">⠿</span> Step 2 · Style</span>
+      <span class="order-badge">2</span>
+    </div>
+    <div class="lane-cards" data-topic="css">
+    <div class="card" data-topic="css">
+      <span class="reg-mark left"></span><span class="reg-mark right"></span>
+      <span class="drag-handle">⠿</span>
+      <span class="label" contenteditable="false">CSS</span>
+      <h3 contenteditable="false">Style the page professionally</h3>
+      <p contenteditable="false">Apply layout, typography, color, and spacing to turn the HTML skeleton into a polished, professional-looking page.</p>
+      <div class="card-footer">
+        <div class="assignee">
+          <span class="avatar">M</span>
+          <span class="assignee-name" contenteditable="false">Mira</span>
+        </div>
+        <span class="status" data-state="will-do">Will do</span>
+      </div>
+    </div>
+
+      <div class="card subcard" data-topic="css">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Typography system</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Mira</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+      <div class="card subcard" data-topic="css">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Layout &amp; grid</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Mira</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+      <div class="card subcard" data-topic="css">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Colors &amp; theme</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Mira</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lane">
+    <div class="lane-title">
+      <span class="lane-title-text"><span class="lane-drag-handle">⠿</span> Step 3 · Behavior</span>
+      <span class="order-badge">3</span>
+    </div>
+    <div class="lane-cards" data-topic="js">
+    <div class="card" data-topic="js">
+      <span class="reg-mark left"></span><span class="reg-mark right"></span>
+      <span class="drag-handle">⠿</span>
+      <span class="label" contenteditable="false">JavaScript</span>
+      <h3 contenteditable="false">Add interactivity</h3>
+      <p contenteditable="false">Write professional JavaScript to handle interactions, dynamic behavior, and any logic the page needs once HTML and CSS are ready.</p>
+      <div class="card-footer">
+        <div class="assignee">
+          <span class="avatar">M</span>
+          <span class="assignee-name" contenteditable="false">Maria</span>
+        </div>
+        <span class="status" data-state="will-do">Will do</span>
+      </div>
+    </div>
+
+      <div class="card subcard" data-topic="js">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Event handling</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Maria</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+      <div class="card subcard" data-topic="js">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Form validation</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Maria</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+      <div class="card subcard" data-topic="js">
+        <span class="reg-mark left"></span><span class="reg-mark right"></span>
+        <span class="drag-handle">⠿</span>
+        <h3 contenteditable="false">Dynamic UI state</h3>
+        <div class="card-footer">
+          <div class="assignee">
+            <span class="avatar">M</span>
+            <span class="assignee-name" contenteditable="false">Maria</span>
+          </div>
+          <span class="status" data-state="will-do">Will do</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<footer class="note">Drag a lane's ⠿ title to swap the position of whole role groups (HTML ⇄ CSS ⇄ JavaScript). Drag a single card's ⠿ handle to move just that card into another lane. Click a status pill to cycle Will do → Doing → Done. Use "Edit names &amp; roles" to rename people or rewrite tasks.</footer>
+
+<script>
+  // Status cycling: Will do -> Doing -> Done -> Will do
+  var order = ['will-do', 'doing', 'done'];
+  var labels = { 'will-do': 'Will do', 'doing': 'Doing', 'done': 'Done' };
+
+  document.querySelectorAll('.status').forEach(function(status){
+    status.addEventListener('click', function(){
+      var current = status.getAttribute('data-state');
+      var next = order[(order.indexOf(current) + 1) % order.length];
+      status.setAttribute('data-state', next);
+      status.textContent = labels[next];
+    });
+  });
+
+  // Avatar initial follows the assignee name automatically
+  function syncAvatar(card){
+    var name = card.querySelector('.assignee-name').textContent.trim();
+    var avatar = card.querySelector('.avatar');
+    avatar.textContent = name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  // Edit mode toggle: makes title, description, and assignee name editable in place
+  var editBtn = document.getElementById('editToggle');
+  var editing = false;
+  var editableSelectors = 'h3, p, .assignee-name';
+
+  editBtn.addEventListener('click', function(){
+    editing = !editing;
+    document.querySelectorAll('.card').forEach(function(card){
+      card.querySelectorAll(editableSelectors).forEach(function(el){
+        el.setAttribute('contenteditable', editing ? 'true' : 'false');
+      });
+    });
+    editBtn.textContent = editing ? '💾 Done editing' : '✏️ Edit names & roles';
+    editBtn.classList.toggle('active', editing);
+  });
+
+  document.querySelectorAll('.assignee-name').forEach(function(nameEl){
+    nameEl.addEventListener('input', function(){
+      syncAvatar(nameEl.closest('.card'));
+    });
+  });
+
+  // Theme toggle: dark (default) <-> light
+  var themeBtn = document.getElementById('themeToggle');
+  var html = document.documentElement;
+  html.setAttribute('data-theme', 'dark');
+
+  themeBtn.addEventListener('click', function(){
+    var isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    themeBtn.textContent = isDark ? '☀️ Light mode' : '🌙 Dark mode';
+  });
+
+  // Drag & drop: move any card into another lane to change its role/topic
+  var topicLabels = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
+  var draggedCard = null;
+
+  function setCardsDraggable(state){
+    document.querySelectorAll('.card').forEach(function(c){ c.draggable = state; });
+  }
+  setCardsDraggable(true);
+
+  function applyTopic(card, topic){
+    card.setAttribute('data-topic', topic);
+    var label = card.querySelector('.label');
+    if(label){ label.textContent = topicLabels[topic] || topic; }
+  }
+
+  function getDragAfterElement(container, y){
+    var elements = Array.prototype.slice.call(container.querySelectorAll('.card:not(.dragging)'));
+    return elements.reduce(function(closest, child){
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if(offset < 0 && offset > closest.offset){
+        return { offset: offset, element: child };
+      }
+      return closest;
+    }, { offset: -Infinity, element: null }).element;
+  }
+
+  document.querySelectorAll('.card').forEach(function(card){
+    card.addEventListener('dragstart', function(){
+      draggedCard = card;
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', function(){
+      card.classList.remove('dragging');
+      draggedCard = null;
+      document.querySelectorAll('.lane-cards').forEach(function(c){ c.classList.remove('drag-over'); });
+    });
+  });
+
+  document.querySelectorAll('.lane-cards').forEach(function(container){
+    container.addEventListener('dragover', function(e){
+      if(!draggedCard) return;
+      e.preventDefault();
+      container.classList.add('drag-over');
+      var afterEl = getDragAfterElement(container, e.clientY);
+      if(afterEl == null){
+        container.appendChild(draggedCard);
+      } else {
+        container.insertBefore(draggedCard, afterEl);
+      }
+    });
+    container.addEventListener('dragleave', function(e){
+      if(e.target === container){ container.classList.remove('drag-over'); }
+    });
+    container.addEventListener('drop', function(e){
+      e.preventDefault();
+      container.classList.remove('drag-over');
+      if(!draggedCard) return;
+      applyTopic(draggedCard, container.getAttribute('data-topic'));
+    });
+  });
+
+  // Turn dragging off while editing so selecting text doesn't start a drag
+  editBtn.addEventListener('click', function(){
+    setCardsDraggable(!editing);
+  });
+
+  // Whole-lane drag & drop: reorder entire role groups (swap HTML/CSS/JS columns)
+  var draggedLane = null;
+  var board = document.querySelector('.board');
+
+  document.querySelectorAll('.lane').forEach(function(lane){
+    lane.setAttribute('draggable', 'true');
+
+    lane.addEventListener('dragstart', function(e){
+      // If the drag actually started on a card, let card-level dragging handle it instead
+      if(e.target.closest('.card')){ return; }
+      draggedLane = lane;
+      lane.classList.add('dragging-lane');
+    });
+    lane.addEventListener('dragend', function(){
+      lane.classList.remove('dragging-lane');
+      draggedLane = null;
+    });
+  });
+
+  function getLaneAfterElement(container, x){
+    var lanes = Array.prototype.slice.call(container.querySelectorAll('.lane:not(.dragging-lane)'));
+    return lanes.reduce(function(closest, child){
+      var box = child.getBoundingClientRect();
+      var offset = x - box.left - box.width / 2;
+      if(offset < 0 && offset > closest.offset){
+        return { offset: offset, element: child };
+      }
+      return closest;
+    }, { offset: -Infinity, element: null }).element;
+  }
+
+  board.addEventListener('dragover', function(e){
+    if(!draggedLane) return;
+    e.preventDefault();
+    var afterLane = getLaneAfterElement(board, e.clientX);
+    if(afterLane == null){
+      board.appendChild(draggedLane);
+    } else if(afterLane !== draggedLane){
+      board.insertBefore(draggedLane, afterLane);
+    }
+  });
+  board.addEventListener('drop', function(e){
+    if(!draggedLane) return;
+    e.preventDefault();
+  });
+</script>
+
+</body>
+</html>
